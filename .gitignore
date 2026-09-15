@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.env
+*.pem
+*.key
+terraform/.terraform/
+terraform/*.tfstate*
+terraform/terraform.tfvars
+terraform/tfplan

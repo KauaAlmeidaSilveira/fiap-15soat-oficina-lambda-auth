@@ -1,0 +1,13 @@
+{
+  "name": "fiap-15soat-oficina-lambda-auth",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test \"test/unit/**/*.test.js\"",
+    "test:integracao": "node --test \"test/integracao/**/*.test.js\"",
+    "token:local": "node scripts/emitir-token-local.js",
+    "empacotar": "sh scripts/empacotar.sh"
+  }
+}
