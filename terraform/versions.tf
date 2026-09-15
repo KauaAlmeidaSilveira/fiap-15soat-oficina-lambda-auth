@@ -6,6 +6,13 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.60"
     }
+
+    # Usado so para dar margem de propagacao entre publicar a rota do discovery
+    # e criar o authorizer (ver api_gateway.tf).
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.11"
+    }
   }
 
   backend "s3" {

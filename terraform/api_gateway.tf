@@ -58,9 +58,20 @@ resource "aws_apigatewayv2_integration" "api" {
 # O issuer e a propria URL do Gateway: a Lambda publica discovery e JWKS nela.
 #
 # A AWS busca o /.well-known/openid-configuration NA CRIACAO do authorizer, nao so a cada
-# requisicao. Sem o depends_on abaixo a criacao falha com "Invalid issuer ... must have a valid
-# discovery endpoint": a rota do discovery precisa existir, estar publicada no stage e a Lambda
-# precisa ter permissao de invocacao antes deste recurso.
+# requisicao, e a rota leva alguns segundos para comecar a responder depois que o stage publica.
+# No primeiro apply desta infraestrutura o authorizer foi criado 1 segundo apos o stage e falhou
+# com "Invalid issuer ... must have a valid discovery endpoint". Por isso a espera abaixo, alem
+# das dependencias de rota, stage e permissao de invocacao da Lambda.
+resource "time_sleep" "discovery_publicado" {
+  depends_on = [
+    aws_apigatewayv2_route.well_known,
+    aws_apigatewayv2_stage.default,
+    aws_lambda_permission.api_gateway,
+  ]
+
+  create_duration = "60s"
+}
+
 resource "aws_apigatewayv2_authorizer" "jwt" {
   api_id           = aws_apigatewayv2_api.oficina.id
   name             = "${var.project_name}-jwt"
@@ -72,11 +83,7 @@ resource "aws_apigatewayv2_authorizer" "jwt" {
     audience = ["oficina-api"]
   }
 
-  depends_on = [
-    aws_apigatewayv2_route.well_known,
-    aws_apigatewayv2_stage.default,
-    aws_lambda_permission.api_gateway,
-  ]
+  depends_on = [time_sleep.discovery_publicado]
 }
 
 resource "aws_apigatewayv2_route" "autenticacao" {
