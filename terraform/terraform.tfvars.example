@@ -1,0 +1,7 @@
+# Copie para terraform.tfvars (gitignorado). Em CI os valores vem de TF_VAR_* .
+db_password     = "mesma-senha-do-infra-db"
+jwt_private_key = <<-EOT
+-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----
+EOT
