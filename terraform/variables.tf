@@ -11,26 +11,13 @@ variable "project_name" {
   default     = "oficina"
 }
 
-variable "db_name" {
-  description = "Nome do banco no RDS"
+variable "os_internal_url" {
+  description = "URL interna do OS Service, que responde as rotas /internal/auth/*"
   type        = string
-  default     = "oficina"
-}
-
-variable "db_username" {
-  description = "Usuario do banco usado pela Lambda"
-  type        = string
-  default     = "oficina"
-}
-
-variable "db_password" {
-  description = "Senha do banco (vai para o Secrets Manager, nunca para variavel de ambiente)"
-  type        = string
-  sensitive   = true
 }
 
 variable "jwt_private_key" {
-  description = "Chave privada RSA em PEM - o mesmo par usado pela API"
+  description = "Chave privada RSA em PEM - os servicos Java so recebem a chave publica"
   type        = string
   sensitive   = true
 }

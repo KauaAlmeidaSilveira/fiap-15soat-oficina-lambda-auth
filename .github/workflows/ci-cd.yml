@@ -22,18 +22,6 @@ jobs:
   testes:
     name: Testes
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +35,7 @@ jobs:
       - name: Testes unitarios
         run: npm test
 
-      - name: Testes de integracao (Postgres real)
+      - name: Testes de integracao (HTTP contra o contrato interno)
         run: npm run test:integracao
 
   validacao-terraform:
@@ -106,7 +94,7 @@ jobs:
         id: plan
         working-directory: terraform
         env:
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_os_internal_url: ${{ vars.OS_INTERNAL_URL }}
           TF_VAR_jwt_private_key: ${{ secrets.JWT_PRIVATE_KEY }}
         run: |
           terraform init -lock-timeout=5m
@@ -162,7 +150,7 @@ jobs:
       - name: Apply
         working-directory: terraform
         env:
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_os_internal_url: ${{ vars.OS_INTERNAL_URL }}
           TF_VAR_jwt_private_key: ${{ secrets.JWT_PRIVATE_KEY }}
         run: |
           terraform init -lock-timeout=5m
