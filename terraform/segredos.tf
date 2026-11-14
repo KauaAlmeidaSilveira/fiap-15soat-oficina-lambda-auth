@@ -9,6 +9,5 @@ resource "aws_secretsmanager_secret_version" "auth" {
   secret_id = aws_secretsmanager_secret.auth.id
   secret_string = jsonencode({
     jwtPrivateKey = var.jwt_private_key
-    dbPassword    = var.db_password
   })
 }

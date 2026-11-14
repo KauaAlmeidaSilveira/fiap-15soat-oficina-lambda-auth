@@ -4,7 +4,7 @@ locals {
 
 resource "aws_security_group" "lambda" {
   name        = "${var.project_name}-auth-lambda-sg"
-  description = "Lambda de autenticacao: so trafego de saida (RDS e Secrets Manager via NAT)"
+  description = "Lambda de autenticacao: so trafego de saida (OS Service e Secrets Manager via NAT)"
   vpc_id      = data.aws_vpc.main.id
 
   egress {
@@ -37,10 +37,8 @@ resource "aws_lambda_function" "auth" {
 
   environment {
     variables = {
-      DB_HOST   = data.aws_db_instance.oficina.address
-      DB_NAME   = var.db_name
-      DB_USER   = var.db_username
-      SECRET_ID = aws_secretsmanager_secret.auth.arn
+      OS_INTERNAL_URL = var.os_internal_url
+      SECRET_ID       = aws_secretsmanager_secret.auth.arn
     }
   }
 

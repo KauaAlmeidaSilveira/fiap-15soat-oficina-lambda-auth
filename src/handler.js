@@ -1,6 +1,6 @@
 import { criarAutenticacao } from './autenticacao.js';
 import { ErroHttp } from './erros.js';
-import { criarPool, criarRepositorio } from './repositorio.js';
+import { criarRepositorio } from './repositorio.js';
 import { lerSegredos } from './segredos.js';
 import { senhas } from './senhas.js';
 import { criarTokens } from './tokens.js';
@@ -88,16 +88,10 @@ let dependenciasDeProducao;
 async function carregarDependenciasDeProducao() {
   if (!dependenciasDeProducao) {
     dependenciasDeProducao = (async () => {
-      const { jwtPrivateKey, dbPassword } = await lerSegredos(process.env.SECRET_ID);
-      const pool = criarPool({
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        user: process.env.DB_USER,
-        password: dbPassword,
-        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
-      });
+      const { jwtPrivateKey } = await lerSegredos(process.env.SECRET_ID);
       const tokens = await criarTokens(jwtPrivateKey);
-      const autenticacao = criarAutenticacao({ repositorio: criarRepositorio(pool), senhas, tokens });
+      const repositorio = criarRepositorio({ baseUrl: process.env.OS_INTERNAL_URL, tokenInterno: () => tokens.emitirInterno() });
+      const autenticacao = criarAutenticacao({ repositorio, senhas, tokens });
       return { autenticacao, tokens };
     })().catch((erro) => {
       dependenciasDeProducao = undefined;

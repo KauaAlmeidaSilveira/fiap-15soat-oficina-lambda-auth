@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from 'jose';
-import { AUDIENCIA, criarTokens } from '../../src/tokens.js';
+import { AUDIENCIA, AUDIENCIA_INTERNA, EMISSOR_INTERNO, criarTokens } from '../../src/tokens.js';
 
 const ISSUER = 'https://abc123.execute-api.us-east-1.amazonaws.com';
 
@@ -41,4 +41,14 @@ test('header e JWKS compartilham o mesmo kid', async () => {
 test('aceita chave privada em PKCS#1', async () => {
   const tokens = await criarTokens(chavePem('pkcs1'));
   assert.equal(tokens.jwks().keys.length, 1);
+});
+
+test('token interno tem emissor e audiência próprios, válido por 60 segundos', async () => {
+  const tokens = await criarTokens(chavePem('pkcs8'));
+
+  const token = await tokens.emitirInterno();
+  const { payload } = await jwtVerify(token, createLocalJWKSet(tokens.jwks()), { issuer: EMISSOR_INTERNO, audience: AUDIENCIA_INTERNA });
+
+  assert.equal(payload.exp - payload.iat, 60);
+  await assert.rejects(jwtVerify(token, createLocalJWKSet(tokens.jwks()), { audience: AUDIENCIA }));
 });

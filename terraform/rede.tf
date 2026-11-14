@@ -20,10 +20,6 @@ data "aws_subnets" "private" {
   }
 }
 
-data "aws_db_instance" "oficina" {
-  db_instance_identifier = "${var.project_name}-db"
-}
-
 # Criado pelo Service do Kubernetes (k8s/service.yaml na API), nao por Terraform:
 # este repositorio so pode ser aplicado depois do primeiro deploy da API.
 data "aws_lb" "api" {

@@ -17,9 +17,8 @@ flowchart LR
     GW -->|/auth/*, /.well-known/*| L[Lambda oficina-auth<br/>Node 22, subnets privadas]
     GW -->|/api/** com JWT authorizer| VL[VPC Link]
     VL --> NLB[NLB interno] --> API[Pods da API no EKS]
-    L --> SM[Secrets Manager<br/>chave RSA + senha do banco]
-    L --> RDS[(RDS PostgreSQL)]
-    API --> RDS
+    L --> SM[Secrets Manager<br/>chave RSA]
+    L -->|/internal/auth/* com token de serviço| API
 ```
 
 ## Autenticação
@@ -35,7 +34,10 @@ CPF é praticamente um dado público: identifica, mas não autentica. Por isso o
 | `GET /.well-known/openid-configuration` | — | discovery usado pelo JWT authorizer |
 | `GET /.well-known/jwks.json` | — | chave pública |
 
-Tokens: RS256, `aud = oficina-api`, `iss` = URL do Gateway. Funcionário recebe as roles do banco;
+A Lambda não acessa banco: lê usuários e clientes pelas rotas `/internal/auth/*` do OS Service, com
+um token próprio de 60 segundos (`iss = oficina-lambda-auth`, `aud = oficina-os`).
+
+Tokens: RS256, `aud = oficina-api`, `iss` = URL do Gateway. Funcionário recebe as roles do cadastro no OS Service;
 cliente recebe `roles = ["CLIENTE"]` e `sub` = id do cliente. As rotas `/auth/*` têm throttling de
 5 req/s (burst 10).
 
@@ -44,7 +46,7 @@ errada recebem a mesma resposta 401; o status `INATIVO` só é revelado depois q
 
 ## Tecnologias
 
-Node.js 22 · `pg` · `bcryptjs` · `jose` · AWS Lambda · API Gateway HTTP API · Secrets Manager ·
+Node.js 22 · `bcryptjs` · `jose` · AWS Lambda · API Gateway HTTP API · Secrets Manager ·
 Terraform · GitHub Actions
 
 ## Desenvolvimento
@@ -53,16 +55,11 @@ Terraform · GitHub Actions
 nvm use                      # Node 22
 npm ci
 npm test                     # unitários
-
-docker run -d --name oficina-auth-pg -e POSTGRES_PASSWORD=postgres -p 5433:5432 postgres:16
-npm run test:integracao      # repositório contra Postgres real
+npm run test:integracao      # repositório contra servidor HTTP com o contrato interno
 
 # Token para chamar a API rodando em localhost:8080, sem Gateway
 npm run token:local -- --sub kaua@gmail.com --roles ADMIN
 ```
-
-Os testes de integração apagam e recriam as tabelas `users`, `roles`, `users_roles` e `cliente`.
-Para usar outro Postgres, aponte `DATABASE_URL_TESTE` para um banco **dedicado** a esses testes.
 
 ## Deploy
 
@@ -74,12 +71,12 @@ Pipeline em `.github/workflows/ci-cd.yml`:
 | Push em `main` | testes, empacotamento, `terraform apply` no Environment `producao` e smoke test |
 
 Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (painel do Academy),
-`DB_PASSWORD` (a mesma do `infra-db`) e `JWT_PRIVATE_KEY` (a mesma da API).
+e `JWT_PRIVATE_KEY`. A variável `OS_INTERNAL_URL` aponta para o OS Service.
 
 ### Ordem de subida (primeira vez)
 
 1. `infra-k8s` → `infra-db`
-2. Deploy da API: cria o NLB interno e a coluna `cliente.senha_hash`
+2. Deploy do OS Service: cria o NLB interno e a coluna `cliente.senha_hash`
 3. Este repositório: encontra o NLB por tag e publica o Gateway
 4. Copiar o output `api_gateway_url` para o secret `APP_PUBLIC_BASE_URL` da API
 5. Novo deploy da API (passa a aceitar tokens com esse emissor)
