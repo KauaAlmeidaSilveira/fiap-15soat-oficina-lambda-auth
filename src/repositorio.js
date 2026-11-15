@@ -1,3 +1,5 @@
+import { CABECALHO, correlationIdAtual } from './correlacao.js';
+
 const TEMPO_LIMITE_MS = 3_000;
 
 export function criarRepositorio({ baseUrl, tokenInterno, fetch: chamar = globalThis.fetch }) {
@@ -7,6 +9,7 @@ export function criarRepositorio({ baseUrl, tokenInterno, fetch: chamar = global
       headers: {
         authorization: `Bearer ${await tokenInterno()}`,
         ...(opcoes.body ? { 'content-type': 'application/json' } : {}),
+        ...(correlationIdAtual() ? { [CABECALHO]: correlationIdAtual() } : {}),
       },
       signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
     });
