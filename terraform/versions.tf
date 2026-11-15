@@ -16,7 +16,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "fiap-15soat-oficina-tfstate"
+    bucket         = "fiap-15soat-oficina-fase4-tfstate"
     key            = "lambda-auth/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "fiap-15soat-oficina-tflock"

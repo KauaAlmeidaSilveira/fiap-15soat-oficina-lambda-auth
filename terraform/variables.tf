@@ -12,8 +12,9 @@ variable "project_name" {
 }
 
 variable "os_internal_url" {
-  description = "URL interna do OS Service, que responde as rotas /internal/auth/*"
+  description = "URL interna do OS Service, que responde as rotas /internal/auth/*. Vazio: usa o NLB interno do OS"
   type        = string
+  default     = null
 }
 
 variable "jwt_private_key" {

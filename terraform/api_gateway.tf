@@ -5,14 +5,35 @@ locals {
     "POST /auth/cliente/primeiro-acesso",
   ]
 
-  rotas_publicas_api = [
-    "GET /aprovacao-os",
-    "GET /actuator/health",
-    "GET /swagger-ui.html",
-    "GET /swagger-ui/{proxy+}",
-    "GET /v3/api-docs",
-    "GET /v3/api-docs/{proxy+}",
-  ]
+  # Prefixos protegidos por JWT, por servico. Cada prefixo vira duas rotas (o prefixo exato e
+  # "/{proxy+}"), porque {proxy+} exige ao menos um segmento depois do prefixo.
+  # /internal/* fica de fora de proposito: so trafega dentro do cluster.
+  prefixos_protegidos = {
+    os       = ["/api/auth", "/api/clientes", "/api/veiculos", "/api/ordens-servico", "/api/minhas-ordens-servico"]
+    execucao = ["/api/execucoes", "/api/produtos"]
+    billing  = ["/api/orcamentos", "/api/pagamentos"]
+  }
+
+  rotas_protegidas = merge([
+    for servico, prefixos in local.prefixos_protegidos : merge([
+      for prefixo in prefixos : {
+        "ANY ${prefixo}"          = servico
+        "ANY ${prefixo}/{proxy+}" = servico
+      }
+    ]...)
+  ]...)
+
+  # Rotas sem token. O link de aprovacao carrega o proprio token (par "aprovacao"), e o webhook do
+  # Mercado Pago so dispara a consulta da order na API do Mercado Pago, sem confiar no corpo.
+  rotas_publicas = {
+    "GET /aprovacao-os"           = "billing"
+    "POST /webhooks/mercado-pago" = "billing"
+    "GET /actuator/health"        = "os"
+    "GET /swagger-ui.html"        = "os"
+    "GET /swagger-ui/{proxy+}"    = "os"
+    "GET /v3/api-docs"            = "os"
+    "GET /v3/api-docs/{proxy+}"   = "os"
+  }
 }
 
 resource "aws_apigatewayv2_api" "oficina" {
@@ -29,7 +50,7 @@ resource "aws_apigatewayv2_integration" "lambda" {
 
 resource "aws_security_group" "vpc_link" {
   name        = "${var.project_name}-api-vpc-link-sg"
-  description = "ENIs do VPC Link do API Gateway ate o NLB interno da API"
+  description = "ENIs do VPC Link do API Gateway ate os NLBs internos dos servicos"
   vpc_id      = data.aws_vpc.main.id
 
   egress {
@@ -46,11 +67,12 @@ resource "aws_apigatewayv2_vpc_link" "api" {
   security_group_ids = [aws_security_group.vpc_link.id]
 }
 
-resource "aws_apigatewayv2_integration" "api" {
+resource "aws_apigatewayv2_integration" "servico" {
+  for_each           = local.servicos
   api_id             = aws_apigatewayv2_api.oficina.id
   integration_type   = "HTTP_PROXY"
   integration_method = "ANY"
-  integration_uri    = data.aws_lb_listener.api.arn
+  integration_uri    = data.aws_lb_listener.servico[each.key].arn
   connection_type    = "VPC_LINK"
   connection_id      = aws_apigatewayv2_vpc_link.api.id
 }
@@ -99,18 +121,19 @@ resource "aws_apigatewayv2_route" "well_known" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
-resource "aws_apigatewayv2_route" "publicas_api" {
-  for_each  = toset(local.rotas_publicas_api)
+resource "aws_apigatewayv2_route" "publicas" {
+  for_each  = local.rotas_publicas
   api_id    = aws_apigatewayv2_api.oficina.id
-  route_key = each.value
-  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+  route_key = each.key
+  target    = "integrations/${aws_apigatewayv2_integration.servico[each.value].id}"
 }
 
 # /actuator/prometheus propositalmente sem rota: o coletor do New Relic le de dentro do cluster.
-resource "aws_apigatewayv2_route" "api_protegida" {
+resource "aws_apigatewayv2_route" "protegidas" {
+  for_each           = local.rotas_protegidas
   api_id             = aws_apigatewayv2_api.oficina.id
-  route_key          = "ANY /api/{proxy+}"
-  target             = "integrations/${aws_apigatewayv2_integration.api.id}"
+  route_key          = each.key
+  target             = "integrations/${aws_apigatewayv2_integration.servico[each.value].id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
