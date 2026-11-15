@@ -1,5 +1,6 @@
 # Copie para terraform.tfvars (gitignorado). Em CI os valores vem de TF_VAR_* .
-os_internal_url = "http://nlb-interno-do-os"
+# os_internal_url e opcional: sem ele, a Lambda usa o NLB interno do OS.
+# os_internal_url = "http://nlb-interno-do-os"
 jwt_private_key = <<-EOT
 -----BEGIN PRIVATE KEY-----
 ...

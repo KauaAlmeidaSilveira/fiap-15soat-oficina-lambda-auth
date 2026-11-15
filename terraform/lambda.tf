@@ -1,5 +1,39 @@
+resource "aws_iam_role" "lambda" {
+  name = "${var.project_name}-auth-lambda"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+# Logs no CloudWatch e criacao das ENIs na VPC.
+resource "aws_iam_role_policy_attachment" "lambda_vpc" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_segredo" {
+  name = "segredo-auth"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "secretsmanager:GetSecretValue"
+      Resource = aws_secretsmanager_secret.auth.arn
+    }]
+  })
+}
+
 locals {
-  lab_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/LabRole"
+  # Sem valor em os_internal_url, a Lambda fala com o NLB interno do OS.
+  os_internal_url = coalesce(var.os_internal_url, "http://${data.aws_lb.servico["os"].dns_name}")
 }
 
 resource "aws_security_group" "lambda" {
@@ -22,7 +56,7 @@ resource "aws_cloudwatch_log_group" "lambda" {
 
 resource "aws_lambda_function" "auth" {
   function_name    = "${var.project_name}-auth"
-  role             = local.lab_role_arn
+  role             = aws_iam_role.lambda.arn
   runtime          = "nodejs22.x"
   handler          = "src/handler.handler"
   filename         = var.pacote_lambda
@@ -37,12 +71,17 @@ resource "aws_lambda_function" "auth" {
 
   environment {
     variables = {
-      OS_INTERNAL_URL = var.os_internal_url
+      OS_INTERNAL_URL = local.os_internal_url
       SECRET_ID       = aws_secretsmanager_secret.auth.arn
     }
   }
 
-  depends_on = [aws_cloudwatch_log_group.lambda, aws_secretsmanager_secret_version.auth]
+  depends_on = [
+    aws_cloudwatch_log_group.lambda,
+    aws_secretsmanager_secret_version.auth,
+    aws_iam_role_policy_attachment.lambda_vpc,
+    aws_iam_role_policy.lambda_segredo,
+  ]
 }
 
 resource "aws_lambda_permission" "api_gateway" {
