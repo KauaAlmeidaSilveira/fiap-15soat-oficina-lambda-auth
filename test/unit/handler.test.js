@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarHandler } from '../../src/handler.js';
 import { ErroHttp } from '../../src/erros.js';
+import { correlationIdAtual } from '../../src/correlacao.js';
 
 const DOMINIO = 'abc123.execute-api.us-east-1.amazonaws.com';
 
@@ -115,4 +116,30 @@ test('jwks.json devolve as chaves públicas', async () => {
 
   assert.equal(resposta.statusCode, 200);
   assert.deepEqual(JSON.parse(resposta.body), { keys: [{ kid: 'k1' }] });
+});
+
+test('devolve o X-Correlation-Id recebido e o deixa visível durante a requisição', async () => {
+  let vistoNaAutenticacao;
+  const handler = criarHandler(async () => ({
+    autenticacao: {
+      loginFuncionario: async () => {
+        vistoNaAutenticacao = correlationIdAtual();
+        return { token: 't', expiresIn: 1 };
+      },
+    },
+  }));
+
+  const resposta = await handler(evento('POST /auth/funcionario', { username: 'a', senha: 'b' }));
+
+  assert.equal(resposta.headers['x-correlation-id'], 'rastreio-1');
+  assert.equal(vistoNaAutenticacao, 'rastreio-1');
+  assert.equal(correlationIdAtual(), undefined);
+});
+
+test('gera um X-Correlation-Id quando a requisição não traz', async () => {
+  const { handler } = montar();
+
+  const resposta = await handler(evento('GET /auth/qualquer', undefined, { headers: {} }));
+
+  assert.match(resposta.headers['x-correlation-id'], /^[0-9a-f-]{36}$/);
 });

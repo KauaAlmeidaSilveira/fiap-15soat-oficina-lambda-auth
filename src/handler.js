@@ -1,4 +1,5 @@
 import { criarAutenticacao } from './autenticacao.js';
+import { CABECALHO, executarComCorrelacao } from './correlacao.js';
 import { ErroHttp } from './erros.js';
 import { criarRepositorio } from './repositorio.js';
 import { lerSegredos } from './segredos.js';
@@ -61,10 +62,9 @@ async function responder(event, dependencias, issuer) {
 }
 
 export function criarHandler(dependencias) {
-  return async (event) => {
+  return (event) => executarComCorrelacao(event.headers?.[CABECALHO], async (correlationId) => {
     const inicio = Date.now();
     const issuer = `https://${event.requestContext.domainName}`;
-    const correlationId = event.headers?.['x-correlation-id'];
     let resposta;
     try {
       resposta = await responder(event, dependencias, issuer);
@@ -79,8 +79,8 @@ export function criarHandler(dependencias) {
     log('INFO', {
       mensagem: 'requisicao', rota: event.routeKey, status: resposta.statusCode, correlationId, duracaoMs: Date.now() - inicio,
     });
-    return resposta;
-  };
+    return { ...resposta, headers: { ...resposta.headers, [CABECALHO]: correlationId } };
+  });
 }
 
 let dependenciasDeProducao;
