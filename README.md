@@ -80,7 +80,7 @@ npm run token:local -- --sub kaua@gmail.com --roles ADMIN
 
 ## Deploy
 
-O workflow `.github/workflows/ci-cd.yml` (testes, `plan` em PR, `apply` e smoke test em `master`)
+O workflow `.github/workflows/ci-cd.yml` (testes, `plan` em PR, `apply` e smoke test em `main`)
 continua no repositório, mas o GitHub Actions da conta está bloqueado por billing. Na Fase 4 o `apply`
 é manual, pela conta AWS pessoal do Júlio, como parte do `scripts/subir-aws.sh` do repositório do OS:
 
